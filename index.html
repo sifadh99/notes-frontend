@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notes App</title>
+</head>
+<body>
+<h2>Notes App</h2>
+<p id="msg" style="color:red"></p>
+
+<div id="authBox">
+  <h3>Login / Register</h3>
+  <input id="name" placeholder="Name (register only)"><br>
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <input id="interests" placeholder="Interests, comma separated (register only)"><br>
+  <button onclick="login()">Login</button>
+  <button onclick="registerUser()">Register</button>
+  <p><small>First request can take up to 60 seconds (free server wakes up).</small></p>
+</div>
+
+<div id="app" style="display:none">
+  <p>Logged in: <b id="who"></b> <button onclick="logout()">Logout</button></p>
+
+  <h3>My Notes</h3>
+  <input id="nTitle" placeholder="Title"> <input id="nContent" placeholder="Content">
+  <button onclick="addNote()">Add note</button>
+  <ul id="notes"></ul>
+  <button onclick="go('notes',-1,loadNotes)">Prev</button> <span id="nPage"></span> <button onclick="go('notes',1,loadNotes)">Next</button>
+
+  <h3>Posts (public)</h3>
+  <input id="pTitle" placeholder="Title"> <input id="pBody" placeholder="Body">
+  <button onclick="addPost()">Add post</button>
+  <ul id="posts"></ul>
+  <button onclick="go('posts',-1,loadPosts)">Prev</button> <span id="pPage"></span> <button onclick="go('posts',1,loadPosts)">Next</button>
+  <div id="userPostsOut"></div>
+
+  <h3>Users grouped by interest</h3>
+  <input id="iFilter" placeholder="Filter by interest (optional)"> <button onclick="pg.ints=1;loadInterests()">Search</button>
+  <ul id="ints"></ul>
+  <button onclick="go('ints',-1,loadInterests)">Prev</button> <span id="iPage"></span> <button onclick="go('ints',1,loadInterests)">Next</button>
+
+  <div id="adminBox" style="display:none">
+    <hr>
+    <h2>Admin Panel</h2>
+    <h3>Users</h3>
+    <input id="uName" placeholder="Name"> <input id="uEmail" placeholder="Email"> <input id="uPass" placeholder="Password">
+    <input id="uInts" placeholder="Interests (comma separated)">
+    <select id="uRole"><option>user</option><option>admin</option></select>
+    <button onclick="addUser()">Add user</button>
+    <ul id="users"></ul>
+    <button onclick="go('users',-1,loadUsers)">Prev</button> <span id="uPage"></span> <button onclick="go('users',1,loadUsers)">Next</button>
+
+    <h3>All notes</h3>
+    <ul id="anotes"></ul>
+    <button onclick="go('anotes',-1,loadAllNotes)">Prev</button> <span id="aPage"></span> <button onclick="go('anotes',1,loadAllNotes)">Next</button>
+  </div>
+</div>
+
+<script>
+const API = "https://notes-backend-1-t9kp.onrender.com";
+let token = localStorage.getItem("token");
+let me = JSON.parse(localStorage.getItem("me") || "null");
+const pg = { notes: 1, posts: 1, users: 1, anotes: 1, ints: 1 };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const say = (t) => { $("msg").textContent = t || ""; };
+const list = (v) => v.split(",").map((s) => s.trim()).filter(Boolean);
+
+async function api(path, method, body) {
+  let res;
+  try {
+    res = await fetch(API + path, {
+      method: method || "GET",
+      headers: Object.assign({ "Content-Type": "application/json" }, token ? { Authorization: "Bearer " + token } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    say("Cannot reach server. Wait 60 seconds and try again.");
+    throw e;
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    say(data.message || "Error " + res.status);
+    if (res.status === 401 && token) logout();
+    throw new Error(data.message || "error");
+  }
+  say("");
+  return data;
+}
+
+function go(key, d, fn) { pg[key] = Math.max(1, pg[key] + d); fn(); }
+
+function saveAuth(d) {
+  token = d.token; me = d.user;
+  localStorage.setItem("token", token);
+  localStorage.setItem("me", JSON.stringify(me));
+  show();
+}
+async function login() {
+  saveAuth(await api("/auth/login", "POST", { email: $("email").value, password: $("password").value }));
+}
+async function registerUser() {
+  saveAuth(await api("/auth/register", "POST", { name: $("name").value, email: $("email").value, password: $("password").value, interests: list($("interests").value) }));
+}
+function logout() {
+  localStorage.clear(); token = null; me = null; show();
+}
+function show() {
+  $("authBox").style.display = token ? "none" : "block";
+  $("app").style.display = token ? "block" : "none";
+  if (!token) return;
+  $("who").textContent = me.name + " (" + me.role + ")";
+  $("adminBox").style.display = me.role === "admin" ? "block" : "none";
+  loadNotes(); loadPosts(); loadInterests();
+  if (me.role === "admin") { loadUsers(); loadAllNotes(); }
+}
+
+async function loadNotes() {
+  const r = await api("/notes?page=" + pg.notes + "&limit=5");
+  $("nPage").textContent = r.page + "/" + (r.pages || 1);
+  $("notes").innerHTML = r.data.map((n) => "<li><b>" + esc(n.title) + "</b>: " + esc(n.content) +
+    " <button onclick=\"editNote('" + n._id + "')\">Edit</button> <button onclick=\"delNote('" + n._id + "')\">Delete</button></li>").join("");
+}
+async function addNote() {
+  await api("/notes", "POST", { title: $("nTitle").value, content: $("nContent").value });
+  $("nTitle").value = ""; $("nContent").value = ""; pg.notes = 1; loadNotes();
+}
+async function editNote(id) {
+  const title = prompt("New title"); if (title === null) return;
+  const content = prompt("New content");
+  await api("/notes/" + id, "PUT", { title: title, content: content === null ? undefined : content });
+  loadNotes();
+}
+async function delNote(id) {
+  if (!confirm("Delete this note?")) return;
+  await api("/notes/" + id, "DELETE"); loadNotes();
+}
+
+async function loadPosts() {
+  const r = await api("/posts?page=" + pg.posts + "&limit=5");
+  $("pPage").textContent = r.page + "/" + (r.pages || 1);
+  $("posts").innerHTML = r.data.map((p) => "<li><b>" + esc(p.title) + "</b>: " + esc(p.body) +
+    " <button onclick=\"userPosts('" + p.author + "')\">All posts of this author</button></li>").join("");
+}
+async function addPost() {
+  await api("/posts", "POST", { title: $("pTitle").value, body: $("pBody").value });
+  $("pTitle").value = ""; $("pBody").value = ""; pg.posts = 1; loadPosts();
+}
+async function userPosts(id) {
+  const r = await api("/users/" + id + "/posts");
+  $("userPostsOut").innerHTML = "<p><b>Posts by " + esc(r.name) + "</b></p><ul>" +
+    r.posts.map((p) => "<li>" + esc(p.title) + ": " + esc(p.body) + "</li>").join("") + "</ul>";
+}
+
+async function loadInterests() {
+  const f = $("iFilter").value.trim();
+  const r = await api("/users/interests?page=" + pg.ints + "&limit=5" + (f ? "&interest=" + encodeURIComponent(f) : ""));
+  $("iPage").textContent = r.page;
+  $("ints").innerHTML = r.data.map((g) => "<li><b>" + esc(g.interest) + "</b> (" + g.count + "): " +
+    g.users.map((u) => esc(u.name)).join(", ") + "</li>").join("");
+}
+
+async function loadUsers() {
+  const r = await api("/admin/users?page=" + pg.users + "&limit=5");
+  $("uPage").textContent = r.page + "/" + (r.pages || 1);
+  $("users").innerHTML = r.data.map((u) => "<li>" + esc(u.name) + " - " + esc(u.email) + " - " + esc(u.role) +
+    " <button onclick=\"editUser('" + u._id + "')\">Edit</button> <button onclick=\"delUser('" + u._id + "')\">Delete</button></li>").join("");
+}
+async function addUser() {
+  await api("/admin/users", "POST", { name: $("uName").value, email: $("uEmail").value, password: $("uPass").value, role: $("uRole").value, interests: list($("uInts").value) });
+  pg.users = 1; loadUsers();
+}
+async function editUser(id) {
+  const name = prompt("New name (blank = keep)"); if (name === null) return;
+  const role = prompt("Role: user or admin (blank = keep)"); if (role === null) return;
+  await api("/admin/users/" + id, "PUT", { name: name || undefined, role: role || undefined });
+  loadUsers();
+}
+async function delUser(id) {
+  if (!confirm("Delete this user and their notes?")) return;
+  await api("/admin/users/" + id, "DELETE"); loadUsers();
+}
+async function loadAllNotes() {
+  const r = await api("/admin/notes?page=" + pg.anotes + "&limit=5");
+  $("aPage").textContent = r.page + "/" + (r.pages || 1);
+  $("anotes").innerHTML = r.data.map((n) => "<li><b>" + esc(n.title) + "</b>: " + esc(n.content) + " <small>(owner: " + n.owner + ")</small></li>").join("");
+}
+
+show();
+</script>
+</body>
+</html>
