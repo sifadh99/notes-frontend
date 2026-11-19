@@ -4,6 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Notes App</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#1f2937;--muted:#6b7280;--brand:#4f46e5;--line:#e5e7eb;--danger:#dc2626}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);max-width:860px;margin:0 auto;padding:24px 16px 60px;line-height:1.5}
+h2{font-size:28px;margin:0 0 12px}
+h3{margin:28px 0 10px;font-size:18px;padding-left:10px;border-left:4px solid var(--brand)}
+hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+small{color:var(--muted)}
+#msg:not(:empty){background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:8px}
+#authBox,#adminBox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+#adminBox{border-top:4px solid var(--brand);margin-top:32px}
+#authBox input{display:block;width:100%;max-width:360px;margin-bottom:8px}
+#who{color:var(--brand)}
+input,select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;margin:0 4px 6px 0}
+input:focus,select:focus{outline:2px solid var(--brand);border-color:transparent}
+button{padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer;font-size:13px}
+button:hover{background:#eef2ff;border-color:var(--brand)}
+button[onclick^="add"],button[onclick="login()"]{background:var(--brand);border-color:var(--brand);color:#fff}
+button[onclick^="add"]:hover,button[onclick="login()"]:hover{background:#4338ca}
+button[onclick^="del"]{color:var(--danger);border-color:#fecaca}
+button[onclick^="del"]:hover{background:#fee2e2;border-color:var(--danger)}
+ul{list-style:none;padding:0;margin:10px 0}
+li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+li button:first-of-type{margin-left:auto}
+#userPostsOut{background:#eef2ff;border-radius:10px;padding:2px 14px;margin-top:10px}
+#userPostsOut li{background:#fff}
+span[id$="Page"]{margin:0 8px;color:var(--muted);font-weight:600}
+</style>
 </head>
 <body>
 <h2>Notes App</h2>
